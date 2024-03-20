@@ -1,2 +1,1 @@
-# 24w-Tri-Modalities
-24w-Architecture-Build-Research-for-Learning-Tri-Modalities
+# tri-modal 을 위한 research
