@@ -84,18 +84,13 @@ class EverythingAtOnceModel(nn.Module):
             self.text_token_proj = get_projection(text_embed_dim, self.embed_dim, self.token_projection)
             self.audio_token_proj = get_projection(audio_embed_dim, self.embed_dim, self.token_projection)
 
-        # if not self.individual_projections:
-        #     self.proj = get_projection(embed_dim, projection_dim, projection)
-        # else:
-        #     self.video_proj = get_projection(embed_dim, projection_dim, projection)
-        #     self.text_proj = get_projection(embed_dim, projection_dim, projection)
-        #     self.audio_proj = get_projection(embed_dim, projection_dim, projection)
+
 
         self.init_weights()
         # self.commonencoder=CommonEncoder(common_dim=self.embed_dim, latent_dim=512)
-        self.classifier1 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
-        self.classifier2 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
-        self.classifier3 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
+        self.classifier1 = Classifier(latent_dim=2048, num_classes=self.num_classes)
+        self.classifier2 = Classifier(latent_dim=2048, num_classes=self.num_classes)
+        self.classifier3 = Classifier(latent_dim=2048, num_classes=self.num_classes)
 
     def init_weights(self):
         for weights in [self.video_pos_embed, self.audio_pos_embed, self.text_pos_embed]:
@@ -167,15 +162,13 @@ class EverythingAtOnceModel(nn.Module):
             t = (ta + tv) / 2
             return v, a, t
         else:
-            v = torch.concat((va,vt), dim=1) # [16, 1054, 1024]
-            a = torch.concat((at,av), dim=1) # [16, 31, 1024]
-            t = torch.concat((ta,tv), dim=1) # [16, 1025, 1024]
+            v = torch.concat((va.mean(dim=1), vt.mean(dim=1)), dim=1)  # [16, 1054, 1024]
+            a = torch.concat((at.mean(dim=1), av.mean(dim=1)), dim=1)  # [16, 31, 1024]
+            t = torch.concat((ta.mean(dim=1), tv.mean(dim=1)), dim=1)  # [16, 1025, 1024]
 
-            v = self.classifier1(v.mean(dim=1))
-            a = self.classifier1(a.mean(dim=1))
-            t = self.classifier1(t.mean(dim=1))
+            v = self.classifier1(v.view(v.size(0), -1))
+            a = self.classifier2(a.view(a.size(0), -1))
+            t = self.classifier3(t.view(t.size(0), -1))
 
-            # v = (va + vt) / 2
-            # a = (at + av) / 2
-            # t = (ta + tv) / 2
+
             return v, a, t

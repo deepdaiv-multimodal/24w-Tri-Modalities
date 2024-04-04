@@ -1,5 +1,6 @@
 data/
 ckpt/
+weights_classifier/
 
 .idea/
 .DS_store
