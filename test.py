@@ -27,10 +27,10 @@ dataset = MSRVTT_DataLoader(data_path=args.data_path, we=we)
 data_loader = DataLoader(dataset, batch_size=args.batch_size)
 
 net = EverythingAtOnceModel(args).cuda()
-optimizer = torch.optim.Adam(net.parameters(), lr =0.001)
+# optimizer = torch.optim.Adam(net.parameters(), lr =0.001)
 
 net.load_state_dict(checkpoint['model_state_dict'])
-optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+# optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 net.eval()
 
 def get_soft_voting(va, at, tv):

@@ -1,20 +1,6 @@
+import os
 import argparse
 import collections
-# from sacred import Experiment
-# from neptunecontrib.monitoring.sacred import NeptuneObserver
-
-import os
-# import torch.optim as module_optim
-# import torch.optim.lr_scheduler as module_lr_scheduler
-
-# from everything_at_once import data_loader as module_data
-# from everything_at_once import model as module_arch
-# from everything_at_once import loss as module_loss
-
-# from everything_at_once.trainer import Trainer
-# from everything_at_once.metric import RetrievalMetric
-
-# from parse_config import ConfigParser
 
 from dataset.msrvtt_dataloader import MSRVTT_DataLoader
 from model.fusion_model import EverythingAtOnceModel
@@ -66,7 +52,6 @@ def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False):
         # pred = model(video, audio, nframes, text, category)
         # loss = loss_fun(pred, category)
         v, a, t = model(video, audio, nframes, text, category)     
-
         loss_v = loss_fun(v, category)
         loss_a = loss_fun(a, category)
         loss_t = loss_fun(t, category)
@@ -158,16 +143,19 @@ def EvalEmbedvec(val_batch, net):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--we_path', default='GoogleNews-vectors-negative300.bin', type=str)
-    parser.add_argument('--data_path', default='msrvtt_category_train.pkl', type=str)
-    parser.add_argument('--val_data_path', default='msrvtt_category_test.pkl', type=str)
-    parser.add_argument('--save_path', default='weights_classifier', type=str)
+    parser.add_argument('--we_path', default='C:/Users/heeryung/code/24w_deep_daiv/data/GoogleNews-vectors-negative300.bin', type=str)
+    parser.add_argument('--data_path', default='C:/Users/heeryung/code/24w_deep_daiv/data/msrvtt_category_train.pkl', type=str)
+    parser.add_argument('--val_data_path', default='C:/Users/heeryung/code/24w_deep_daiv/msrvtt_category_test.pkl', type=str)
+    parser.add_argument('--save_path', default='C:/Users/heeryung/code/24w_deep_daiv/ckpt', type=str)
     parser.add_argument('--exp', default='trial1', type=str)
     parser.add_argument('--use_softmax', default=True, type=bool)
     parser.add_argument('--use_cls_token', default=False, type=bool)
     parser.add_argument('--token_projection', default='projection_net', type=str)
     parser.add_argument('--num_classes', default=20, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--epoch', default=200, type=int)
+    parser.add_argument('--ckpt_path', default='', type=str)
+    parser.add_argument('--resume', default=False, type=bool)
     #parser.add_argument('--device', default="3", help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     args = parser.parse_args()
 
@@ -185,11 +173,13 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     data_loader = DataLoader(dataset, batch_size=batch_size, pin_memory=True)#, num_workers=4)
     val_data_loader = DataLoader(val_dataset, batch_size=batch_size, pin_memory=True)#, num_workers=4)
+    print('# of train data:', len(data_loader), '# of valid data:', len(val_data_loader))
 
     loss = torch.nn.CrossEntropyLoss()
     net = EverythingAtOnceModel(args).to(device)
-    optimizer = torch.optim.AdamW(net.parameters(), lr =0.001)
+    optimizer = torch.optim.Adam(net.parameters(), lr =0.001)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  # 매 10 에폭마다 학습률을 0.1배로 감소
+    epoch = args.epoch
 
     total_video_correct = 0
     total_audio_correct = 0
@@ -207,7 +197,7 @@ if __name__ == '__main__':
     f1_list = []
 
 
-    for epoch in range(0,1001):
+    for epoch in range(0,epoch+1):
         net.train()
         running_loss = 0.0
 

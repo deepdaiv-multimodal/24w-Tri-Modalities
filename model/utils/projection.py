@@ -73,7 +73,7 @@ class projection_net(nn.Module):
 
         # Fuse적용 X
         if not cross_attention:
-            self.DAVEnet = load_DAVEnet()
+            self.DAVEnet = load_DAVEnet(v2=True)
             self.GU_audio = Gated_Embedding_Unit(4096, embed_dim)
             self.GU_video = Gated_Embedding_Unit(video_dim, embed_dim)
             # self.text_pooling_caption = Sentence_Maxpool(we_dim, embed_dim)
