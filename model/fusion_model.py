@@ -10,7 +10,11 @@ from model.utils.fusion_transformer import FusionTransformer
 from model.utils.davenet import load_DAVEnet
 from model.utils.projection import projection_net
 from model.utils.classifier import Classifier
+<<<<<<< HEAD
 # from model.utils.CommonEncoder import CommonEncoder
+=======
+
+>>>>>>> b68c6485e1a92903be0f721cc1bd770ae30ce8e2
 
 class EverythingAtOnceModel(nn.Module):
     def __init__(self,
@@ -81,18 +85,19 @@ class EverythingAtOnceModel(nn.Module):
             self.text_token_proj = get_projection(text_embed_dim, self.embed_dim, self.token_projection)
             self.audio_token_proj = get_projection(audio_embed_dim, self.embed_dim, self.token_projection)
         
-        # if not self.individual_projections:
-        #     self.proj = get_projection(embed_dim, projection_dim, projection)
-        # else:
-        #     self.video_proj = get_projection(embed_dim, projection_dim, projection)
-        #     self.text_proj = get_projection(embed_dim, projection_dim, projection)
-        #     self.audio_proj = get_projection(embed_dim, projection_dim, projection)
 
         self.init_weights()
+<<<<<<< HEAD
         # self.commonencoder=CommonEncoder(common_dim=self.embed_dim, latent_dim=512)
         self.classifier1 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
         self.classifier2 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
         self.classifier3 = Classifier(latent_dim=self.embed_dim, num_classes=self.num_classes)
+=======
+
+        self.classifier1 = Classifier(latent_dim=2048)
+        self.classifier2 = Classifier(latent_dim=2048)
+        self.classifier3 = Classifier(latent_dim=2048)
+>>>>>>> b68c6485e1a92903be0f721cc1bd770ae30ce8e2
 
     def init_weights(self):
         for weights in [self.video_pos_embed, self.audio_pos_embed, self.text_pos_embed]:
@@ -112,31 +117,12 @@ class EverythingAtOnceModel(nn.Module):
     def extract_video_tokens(self, video):
         x = self.video_token_proj(video)
         x = self.video_norm_layer(x)
-
-        # x, attention_mask, nonempty_input_mask = self._check_and_fix_if_input_empty(x, attention_mask)
-        # special_token_mask = attention_mask == 0
-
         return x
 
+      
     def extract_audio_tokens(self, audio, audio_STFT_nframes):
         audio = self.davenet(audio)
         audio = audio.permute(0, 2, 1)
-
-        # coef = int(np.ceil(attention_mask.shape[1] / audio.shape[1]))
-        # attention_mask = torch.nn.functional.max_pool1d(attention_mask.unsqueeze(0), kernel_size=coef).squeeze(0)
-        # audio_STFT_nframes = (audio_STFT_nframes / coef).int()
-
-        # if (self.audio_max_tokens is not None) and (audio.shape[1] > self.audio_max_tokens):
-        #     new_audio, new_audio_mask = [], []
-        #     for i in range(len(audio)):
-        #         cur_audio, cur_audio_mask = create_audio_tokens(
-        #             audio[i], attention_mask[i], audio_STFT_nframes[i], self.audio_max_tokens, strategy=self.strategy_audio_pooling)
-        #         new_audio.append(cur_audio)
-        #         new_audio_mask.append(cur_audio_mask)
-        # new_audio = [a for a in range(len(audio))]
-        # audio = torch.stack(new_audio, dim=0)
-        # # attention_mask = torch.stack(new_audio_mask, dim=0)
-
         audio = self.audio_token_proj(audio)
         audio = self.audio_norm_layer(audio)
 
@@ -147,16 +133,11 @@ class EverythingAtOnceModel(nn.Module):
     def extract_text_tokens(self, text):
         x = self.text_token_proj(text)
         x = self.text_norm_layer(x)
-
-        # x, attention_mask, nonempty_input_mask = self._check_and_fix_if_input_empty(x, attention_mask)
-        # special_token_mask = attention_mask == 0
         return x
     
     def extract_tokens(self, video, audio, text, nframes):
         audio, text, video = self.token_proj(video, audio, nframes, text)
-        #audio = self.norm_layer(audio)
-        #text = self.norm_layer(text)
-        #video = self.norm_layer(video)
+        
         return audio, text, video
 
     def forward(self, video, audio, nframes, text, category, force_cross_modal=False):
@@ -164,6 +145,7 @@ class EverythingAtOnceModel(nn.Module):
             audio_raw_embed, text_raw_embed, video_raw_embed = self.extract_tokens(video, audio, text, nframes)
             video_raw_embed = torch.unsqueeze(video_raw_embed, 1) # ([16, 1, 1024] [16, 80, 1024] [16, 30, 1024]
         else:
+<<<<<<< HEAD
             text_raw_embed = self.extract_text_tokens(text) 
             video_raw_embed = self.extract_video_tokens(video) 
             audio_raw_embed = self.extract_audio_tokens(audio, nframes) 
@@ -203,3 +185,46 @@ class EverythingAtOnceModel(nn.Module):
 
         return va ,at, tv
 
+=======
+            text_raw_embed = self.extract_text_tokens(text) # [16, 30, 4096]
+            video_raw_embed = self.extract_video_tokens(video) # [16, 4096]
+            audio_raw_embed = self.extract_audio_tokens(audio, nframes) # [16, 80, 4096]
+
+            
+        ### Visual - Audio
+        va = self.fusion(key=video_raw_embed,
+                            query=audio_raw_embed)
+        av = self.fusion(key=audio_raw_embed, query=video_raw_embed)
+
+        va = va.mean(dim=1)
+        av = av.mean(dim=1)
+        vav = torch.cat((va,av), dim=1).view(va.size(0),-1)
+        vav= self.classifier1(vav)
+
+        ##Audio - Text
+        at = self.fusion(key=audio_raw_embed,
+                            query=text_raw_embed)
+        ta = self.fusion(key=text_raw_embed,
+                            query=audio_raw_embed)
+
+        at = at.mean(dim=1)
+        ta = ta.mean(dim=1)
+        ata = torch.cat((at,ta), dim=1).view(va.size(0),-1)
+        ata= self.classifier2(ata)
+
+
+        ##Text - Video
+        tv = self.fusion(key=text_raw_embed,
+                            query=video_raw_embed)
+        #tv = tv + text_raw_embed
+        vt = self.fusion(key=video_raw_embed,
+                            query=text_raw_embed)
+
+        tv = tv.mean(dim=1)
+        vt = vt.mean(dim=1)
+        tvt = torch.cat((tv,vt), dim=1).view(va.size(0),-1)
+        tvt= self.classifier3(tvt)
+
+
+        return vav, ata, tvt
+>>>>>>> b68c6485e1a92903be0f721cc1bd770ae30ce8e2

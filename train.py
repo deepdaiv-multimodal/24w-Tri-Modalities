@@ -16,7 +16,6 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 from functools import partial
-
 import math
 import tqdm
 
@@ -29,13 +28,13 @@ def calculate_f1_score(predictions, labels):
     f1 = f1_score(labels.cpu(), predictions.cpu(), average='weighted')
     return f1
 
+
 def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False, centroid=None):
     video = data['video'].to(device)
     audio = data['audio'].to(device)
     text = data['text'].to(device)
     nframes = data['nframes'].to(device)
     category = data['category'].to(device)
-    # print('video:', video.shape, 'audio:', audio.shape, 'text:', text.shape)
 
     video = video.view(-1, video.shape[-1])
     audio = audio.view(-1, audio.shape[-2], audio.shape[-1])
@@ -44,6 +43,7 @@ def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False, c
 
     bs = video.size(0)
     # print('video:', video.shape, 'audio:', audio.shape, 'text:', text.shape)
+
     opt.zero_grad()
     
     #loss 
@@ -181,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_data_path', default='C:/Users/heeryung/code/24w_deep_daiv/msrvtt_category_test.pkl', type=str)
     parser.add_argument('--save_path', default='C:/Users/heeryung/code/24w_deep_daiv/ckpt', type=str)
     parser.add_argument('--exp', default='trial1', type=str)
+    parser.add_argument('--epoch', default=200, type=int)
     parser.add_argument('--use_softmax', default=True, type=bool)
     parser.add_argument('--use_cls_token', default=False, type=bool)
     parser.add_argument('--token_projection', default='projection_net', type=str)
@@ -192,7 +193,7 @@ if __name__ == '__main__':
     #parser.add_argument('--device', default="3", help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     args = parser.parse_args()
 
-    device = torch.device("cuda")
+    device = torch.device("cuda:" + args.device if torch.cuda.is_available() else "cpu")
     # setup data_loader instances
     we=None
     we=KeyedVectors.load_word2vec_format(args.we_path, binary=True)
@@ -289,22 +290,7 @@ if __name__ == '__main__':
                     print("Soft voting accuracy:", total_soft_vote_correct / total_num)
                 
                 else: 
-                    # accuracy = total_correct / total_num
-                    # print('Accuray:', accuracy)
-                    #
-                    # epochs_list.append(epoch)
-                    # accuracy_list.append(accuracy)
-                    #
-                    # plt.figure(figsize=(10, 6))
-                    # plt.plot(epochs_list, accuracy_list, marker='o', linestyle='-', color='b')
-                    # plt.title('Accuracy over Epochs')
-                    # plt.xlabel('Epoch')
-                    # plt.ylabel('Accuracy')
-                    # plt.grid(True)
-                    # plt.savefig(save_path + '/accuracy_epoch{}.png'.format(epoch))
-                    # plt.close()
-                    #
-                    # print(f"Accuracy graph for epoch {epoch} has been saved.")
+                  
                     hard_vote_accuracy = total_hard_vote_correct / total_num
                     soft_vote_accuracy = total_soft_vote_correct / total_num
                     f1_accuracy = total_f1 / total_num
@@ -312,18 +298,13 @@ if __name__ == '__main__':
                     print("Video accuracy:", total_video_correct / total_num)
                     print("Audio accuracy:", total_audio_correct / total_num)
                     print("Text accuracy:", total_text_correct / total_num)
-                    #print("Hard voting accuracy:", hard_vote_accuracy)
-                    print("Soft voting accuracy:", soft_vote_accuracy)
-                    #print("F1 Score:", f1_accuracy)
 
                     epochs_list.append(epoch)
                     hard_accuracy_list.append(hard_vote_accuracy)
                     soft_accuracy_list.append(soft_vote_accuracy)
                     f1_list.append(f1_accuracy)
 
-
                     plt.figure(figsize=(10, 6))
-                    #plt.plot(epochs_list, hard_accuracy_list, marker='o', linestyle='-', color='b', label='Hard Voting')
                     plt.plot(epochs_list, soft_accuracy_list, marker='o', linestyle='-', color='r', label='Soft Voting')
                     plt.title('Accuracy over Epochs')
                     plt.xlabel('Epoch')
