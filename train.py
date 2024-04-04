@@ -74,17 +74,16 @@ def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False, c
 
         # loss_cluster = cluster_contrast(fushed, centroid, labels[-bs:], bs)
 
-        S = torch.matmul(fushed, centroid.t())
-        target = torch.zeros(bs, centroid.shape[0]).to(S.device)
-        target[range(target.shape[0]), labels] = 1
-        S = S - target * (0.001)
-        loss_cluster = F.nll_loss(F.log_softmax(S, dim=1), labels)
+        # S = torch.matmul(fushed, centroid.t())
+        # target = torch.zeros(bs, centroid.shape[0]).to(S.device)
+        # target[range(target.shape[0]), labels] = 1
+        # S = S - target * (0.001)
         # loss_cluster = F.nll_loss(F.log_softmax(S, dim=1), labels)
 
-        # loss_cluster_v = cluster_contrast(v, centroid, labels[-bs:],bs)
-        # loss_cluster_a = cluster_contrast(a, centroid, labels[-bs:],bs)
-        # loss_cluster_t = cluster_contrast(t, centroid, labels[-bs:],bs)
-        # loss_cluster = loss_cluster_v + loss_cluster_a + loss_cluster_t
+        loss_cluster_v = cluster_contrast(v, centroid, labels[-bs:],bs)
+        loss_cluster_a = cluster_contrast(a, centroid, labels[-bs:],bs)
+        loss_cluster_t = cluster_contrast(t, centroid, labels[-bs:],bs)
+        loss_cluster = loss_cluster_v + loss_cluster_a + loss_cluster_t
 
         loss = loss_correlation + loss_cluster
         print('loss_correlation:', loss_correlation.item(), 'loss_cluster:', loss_cluster.item(), 'total loss:', loss.item())
