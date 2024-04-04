@@ -10,9 +10,15 @@ from model.utils.fusion_transformer import FusionTransformer
 from model.utils.davenet import load_DAVEnet
 from model.utils.projection import projection_net
 from model.utils.classifier import Classifier
+<<<<<<< HEAD
 # from model.utils.CommonEncoder import CommonEncoder
 
 class EverythingAtOnceModel2(nn.Module):
+=======
+from model.utils.CommonEncoder import CommonEncoder
+
+class EverythingAtOnceModel(nn.Module):
+>>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
     def __init__(self,
                  args,
                  embed_dim=1024,
@@ -89,10 +95,20 @@ class EverythingAtOnceModel2(nn.Module):
         #     self.audio_proj = get_projection(embed_dim, projection_dim, projection)
 
         self.init_weights()
+<<<<<<< HEAD
         # self.commonencoder=CommonEncoder(common_dim=self.embed_dim, latent_dim=512)
         self.classifier1 = Classifier(latent_dim=self.embed_dim)
         self.classifier2 = Classifier(latent_dim=self.embed_dim)
         self.classifier3 = Classifier(latent_dim=self.embed_dim)
+=======
+        self.commonencoder=CommonEncoder(common_dim=self.embed_dim, latent_dim=512)
+        self.classifier1 = Classifier(latent_dim=2048)
+        self.classifier2 = Classifier(latent_dim=2048)
+        self.classifier3 = Classifier(latent_dim=2048)
+        #self.mlp1 = nn.Linear(2048,self.num_classes)
+        #self.mlp2 = nn.Linear(2048,self.num_classes)
+        #self.mlp3 = nn.Linear(2048,self.num_classes)
+>>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 
     def init_weights(self):
         for weights in [self.video_pos_embed, self.audio_pos_embed, self.text_pos_embed]:
@@ -162,6 +178,7 @@ class EverythingAtOnceModel2(nn.Module):
     def forward(self, video, audio, nframes, text, category, force_cross_modal=False):
         if self.token_projection == 'projection_net':
             audio_raw_embed, text_raw_embed, video_raw_embed = self.extract_tokens(video, audio, text, nframes)
+<<<<<<< HEAD
             video_raw_embed = torch.unsqueeze(video_raw_embed, 1) # ([16, 1, 1024] [16, 80, 1024] [16, 30, 1024]
         else:
             text_raw_embed = self.extract_text_tokens(text) 
@@ -202,3 +219,95 @@ class EverythingAtOnceModel2(nn.Module):
         # tvt= self.classifier3(tvt)
 
         return va ,at, tv
+=======
+            video_raw_embed = torch.unsqueeze(video_raw_embed, 1) # ([16, 1, 1024] [16, 1024, 1024] [16, 30, 1024]
+        else:
+            text_raw_embed = self.extract_text_tokens(text) # [16, 30, 4096]
+            video_raw_embed = self.extract_video_tokens(video) # [16, 4096]
+            audio_raw_embed = self.extract_audio_tokens(audio, nframes) # [16, 80, 4096]
+
+        '''va = self.fusion(key=video_raw_embed, query=audio_raw_embed) # [16, 1024, 1024]
+        vt = self.fusion(key=video_raw_embed, query=text_raw_embed) # [16, 30, 1024]
+
+        at = self.fusion(key=audio_raw_embed, query=text_raw_embed) # [16, 30, 1024]
+        av = self.fusion(key=audio_raw_embed, query=video_raw_embed) # [16, 1, 1024]
+
+        ta = self.fusion(key=text_raw_embed, query=audio_raw_embed) # [16, 1024, 1024]
+        tv = self.fusion(key=text_raw_embed, query=video_raw_embed) # [16, 1, 1024]'''
+
+
+        ### Visual - Audio
+        va = self.fusion(key=video_raw_embed,
+                            query=audio_raw_embed)
+        #va = va + video_raw_embed
+        av = self.fusion(key=audio_raw_embed, 
+                              query=video_raw_embed)
+        #av = av + audio_raw_embed 
+        # vav = torch.concat((va,av),dim=1) 
+        # vav = vav.mean(dim=1)
+        va = va.mean(dim=1)
+        av = av.mean(dim=1)
+        vav = torch.cat((va,av), dim=1).view(va.size(0),-1)
+        vav= self.classifier1(vav)
+
+        ##Audio - Text
+        at = self.fusion(key=audio_raw_embed,
+                            query=text_raw_embed)
+        #at = at + audio_raw_embed
+        ta = self.fusion(key=text_raw_embed,
+                            query=audio_raw_embed)
+        #ta = ta + text_raw_embed
+        # ata = torch.concat((at,ta), dim=1)
+        # ata = ata.mean(dim=1)
+        at = at.mean(dim=1)
+        ta = ta.mean(dim=1)
+        ata = torch.cat((at,ta), dim=1).view(va.size(0),-1)
+        ata= self.classifier2(ata)
+
+
+        ##Text - Video
+        tv = self.fusion(key=text_raw_embed,
+                            query=video_raw_embed)
+        #tv = tv + text_raw_embed
+        vt = self.fusion(key=video_raw_embed,
+                            query=text_raw_embed)
+        #vt = vt + video_raw_embed
+        # tvt = torch.concat((tv,vt), dim=1)
+        # tvt = tvt.mean(dim=1)
+        tv = tv.mean(dim=1)
+        vt = vt.mean(dim=1)
+        tvt = torch.cat((tv,vt), dim=1).view(va.size(0),-1)
+        tvt= self.classifier3(tvt)
+      
+
+
+        #print(vav.shape, ata.shape,tvt.shape)
+
+
+        '''if self.use_cls_token:
+            v = (va + vt) / 2
+            a = (at + av) / 2
+            t = (ta + tv) / 2
+            return v, a, t
+        else:
+            v = torch.concat((va,vt), dim=1) # [16, 1054, 1024]
+            a = torch.concat((at,av), dim=1) # [16, 31, 1024]
+            t = torch.concat((ta,tv), dim=1) # [16, 1025, 1024]
+
+            # # print('va',va.shape,'vt',vt.shape,'v',v.shape)
+            # # print('at',at.shape,'av',av.shape,'a',a.shape)
+            # # print('ta',ta.shape,'tv',tv.shape,'t',t.shape)
+            # output = self.classifier(v, a, t)
+
+            v = v.mean(dim=1)  # [16, 1054, 1024] -> [16, 1024]
+            a = a.mean(dim=1)  # [16, 31, 1024] -> [16, 1024]
+            t = t.mean(dim=1)  # [16, 1025, 1024] -> [16, 1024]
+
+            # v = (va + vt) / 2
+            # a = (at + av) / 2
+            # t = (ta + tv) / 2'''
+        return vav, ata, tvt
+
+            # return output
+
+>>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0

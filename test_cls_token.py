@@ -1,33 +1,17 @@
 import torch
 import torch.nn as nn
-<<<<<<< HEAD
-from data_loader.msrvtt_dataloader import MSRVTT_DataLoader
-from model.fusion_model_hk import EverythingAtOnceModel
-=======
 from dataset.msrvtt_dataloader import MSRVTT_DataLoader
 from model.fusion_model import EverythingAtOnceModel
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 from gensim.models.keyedvectors import KeyedVectors
 from torch.utils.data import DataLoader
 
 import argparse
 
 parser = argparse.ArgumentParser()
-<<<<<<< HEAD
 parser.add_argument('--we_path', default='./data/GoogleNews-vectors-negative300.bin', type=str)
 parser.add_argument('--data_path', default='C:/Users/heeryung/code/24w_deep_daiv/msrvtt_category_test.pkl', type=str)
 parser.add_argument('--checkpoint_path', default='C:/Users/heeryung/code/24w_deep_daiv/ckpt/trial3_audio_davenet/epoch100.pth', type=str)
 parser.add_argument('--token_projection', default='projection_net', type=str) 
-=======
-parser.add_argument('--we_path', default='GoogleNews-vectors-negative300.bin', type=str)
-parser.add_argument('--data_path', default='msrvtt_category_test.pkl', type=str)
-parser.add_argument('--checkpoint_path', default='epoch210.pth', type=str)
-parser.add_argument('--token_projection', default='projection_net', type=str) 
-parser.add_argument('--use_softmax', default=False, type=bool) 
-parser.add_argument('--use_cls_token', default=False, type=bool) 
-parser.add_argument('--num_classes', default=20, type=int) 
-parser.add_argument('--batch_size', default=16, type=int) 
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 args = parser.parse_args()
 
 checkpoint = torch.load(args.checkpoint_path)
@@ -35,17 +19,12 @@ checkpoint = torch.load(args.checkpoint_path)
 we = None 
 we = KeyedVectors.load_word2vec_format(args.we_path, binary=True)
 
-<<<<<<< HEAD
 dataset = MSRVTT_DataLoader(
         data_path=args.data_path,
         we=we
         )
 
 data_loader = DataLoader(dataset, batch_size=16)
-=======
-dataset = MSRVTT_DataLoader(data_path=args.data_path, we=we)
-data_loader = DataLoader(dataset, batch_size=args.batch_size)
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 
 net = EverythingAtOnceModel(args).cuda()
 optimizer = torch.optim.Adam(net.parameters(), lr =0.001)
@@ -79,10 +58,6 @@ def calculate_accuracy(predictions, labels):
     return accuracy
 
 total_samples = 0
-<<<<<<< HEAD
-=======
-total_accuracy = 0
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 total_video_correct = 0
 total_audio_correct = 0
 total_text_correct = 0
@@ -94,17 +69,12 @@ for data in data_loader:
     audio = data['audio'].cuda()
     text = data['text'].cuda()
     nframes = data['nframes'].cuda()
-<<<<<<< HEAD
     category = data['category'].cuda()
-=======
-    category = data['category'].cuda() # [batch_size,]
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
 
     video = video.view(-1, video.shape[-1])
     audio = audio.view(-1, audio.shape[-2], audio.shape[-1])
     text = text.view(-1, text.shape[-2], text.shape[-1])
 
-<<<<<<< HEAD
     va, at, tv = net(video, audio, nframes, text, category)
     va_preds, at_preds, tv_preds = get_predictions(va, at, tv)
 
@@ -140,16 +110,3 @@ print("Audio accuracy:", audio_accuracy)
 print("Text accuracy:", text_accuracy)
 print("Hard voting accuracy:", hard_vote_accuracy)
 print("Soft voting accuracy:", soft_vote_accuracy)
-=======
-    pred = net(video, audio, nframes, text, category) # [batch_size, 20]
-    pred_category = torch.argmax(pred, dim=1) # [batch_size,]
-    accuracy = torch.mean((pred_category == category).float()) # [batch_size,]
-    print(pred_category, '/', category)
-
-    total_accuracy += accuracy
-
-# Calculate final accuracies
-accuracy = total_accuracy / len(data_loader)
-
-print("Accuracy:", accuracy)
->>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0

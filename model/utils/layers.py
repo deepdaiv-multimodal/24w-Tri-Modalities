@@ -75,9 +75,14 @@ class FusionBlock(nn.Module):
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
     def forward(self, k, q, attention_mask=None):
+<<<<<<< HEAD
         cross_attn_output = self.cross_attn(self.norm1(k), self.norm1(q))
         mlp_output = self.mlp(self.norm2(q))
         output = q + self.drop_path(cross_attn_output) + self.drop_path(mlp_output)  # query만 residual
+=======
+        output = q + self.drop_path(self.cross_attn(self.norm1(k), self.norm1(q)))#, attention_mask))  ##### 1) query만 residual
+        output = output + self.drop_path(self.mlp(self.norm2(output)))
+>>>>>>> 764b33b3e8c429784f721b3f7139f6b5f58782c0
         return output
 
 class ScaleDotProductAttention(nn.Module):
