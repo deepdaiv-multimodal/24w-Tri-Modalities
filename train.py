@@ -17,7 +17,7 @@ import os
 # from parse_config import ConfigParser
 
 from dataset.msrvtt_dataloader import MSRVTT_DataLoader
-from model.fusion_model import EverythingAtOnceModel
+from model.fusion_model_hk import EverythingAtOnceModel
 from gensim.models.keyedvectors import KeyedVectors
 from torch.utils.data import DataLoader
 
@@ -161,13 +161,13 @@ if __name__ == '__main__':
     parser.add_argument('--we_path', default='GoogleNews-vectors-negative300.bin', type=str)
     parser.add_argument('--data_path', default='msrvtt_category_train.pkl', type=str)
     parser.add_argument('--val_data_path', default='msrvtt_category_test.pkl', type=str)
-    parser.add_argument('--save_path', default='weights_classifier', type=str)
-    parser.add_argument('--exp', default='trial1', type=str)
+    parser.add_argument('--save_path', default='weights_mlp3', type=str)
+    parser.add_argument('--exp', default='trial3', type=str)
     parser.add_argument('--use_softmax', default=True, type=bool)
     parser.add_argument('--use_cls_token', default=False, type=bool)
     parser.add_argument('--token_projection', default='projection_net', type=str)
     parser.add_argument('--num_classes', default=20, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     #parser.add_argument('--device', default="3", help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     args = parser.parse_args()
 
@@ -188,7 +188,7 @@ if __name__ == '__main__':
 
     loss = torch.nn.CrossEntropyLoss()
     net = EverythingAtOnceModel(args).to(device)
-    optimizer = torch.optim.AdamW(net.parameters(), lr =0.001)
+    optimizer = torch.optim.Adam(net.parameters(), lr =0.001)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  # 매 10 에폭마다 학습률을 0.1배로 감소
 
     total_video_correct = 0
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     f1_list = []
 
 
-    for epoch in range(0,1001):
+    for epoch in range(0,201):
         net.train()
         running_loss = 0.0
 

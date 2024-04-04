@@ -17,3 +17,4 @@ class Classifier(nn.Module):
         x = F.relu(x)
         x = self.layer_3(x)
         return x
+
