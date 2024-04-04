@@ -3,9 +3,10 @@ import argparse
 import collections
 
 from dataset.msrvtt_dataloader import MSRVTT_DataLoader
-from model.fusion_model import EverythingAtOnceModel
+from model.fusion_model_hk import EverythingAtOnceModel
 from gensim.models.keyedvectors import KeyedVectors
 from torch.utils.data import DataLoader
+from model.utils.cluster_loss import cluster_contrast
 
 from torch.optim.lr_scheduler import StepLR
 
@@ -21,12 +22,14 @@ import tqdm
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
+from fast_pytorch_kmeans import KMeans
+
 
 def calculate_f1_score(predictions, labels):
     f1 = f1_score(labels.cpu(), predictions.cpu(), average='weighted')
     return f1
 
-def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False):
+def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False, centroid=None):
     video = data['video'].to(device)
     audio = data['audio'].to(device)
     text = data['text'].to(device)
@@ -38,28 +41,59 @@ def TrainOneBatch(model, opt, data, loss_fun, apex=False, use_cls_token=False):
     audio = audio.view(-1, audio.shape[-2], audio.shape[-1])
     text = text.view(-1, text.shape[-2], text.shape[-1])
     nframes = nframes.view(-1)
+
+    bs = video.size(0)
     # print('video:', video.shape, 'audio:', audio.shape, 'text:', text.shape)
     opt.zero_grad()
     
     #loss 
     if use_cls_token:
         v, a, t = model(video, audio, nframes, text, category)
-        loss_v = loss_fun(v, category)
-        loss_a = loss_fun(a, category)
-        loss_t = loss_fun(t, category)
+        loss_v = F.cross_entropy(v, category)
+        loss_a = F.cross_entropyloss_fun(a, category)
+        loss_t = F.cross_entropyloss_fun(t, category)
         loss = loss_v + loss_a + loss_t
     else:
         # pred = model(video, audio, nframes, text, category)
         # loss = loss_fun(pred, category)
-        v, a, t = model(video, audio, nframes, text, category)     
-        loss_v = loss_fun(v, category)
-        loss_a = loss_fun(a, category)
-        loss_t = loss_fun(t, category)
-        loss = loss_v + loss_a + loss_t
+        va, at, tv, v, a, t  = model(video, audio, nframes, text, category) 
+        # v = v.mean(dim=1)   
+        # a = a.mean(dim=1) 
+        # t = t.mean(dim=1) 
+        fushed = (v + a + t) / 3
 
+        kmeans = KMeans(bs, mode='cosine', verbose=1)
+        labels = kmeans.fit_predict(fushed)
+        centroid = kmeans.centroids
+        # print('label:',labels,'centroid', centroid, 'fushed:', fushed)
+
+        loss_v = F.cross_entropy(va, category)
+        loss_a = F.cross_entropy(at, category)
+        loss_t = F.cross_entropy(tv, category)
+        loss_correlation = loss_v + loss_a + loss_t
+
+        # loss_cluster = cluster_contrast(fushed, centroid, labels[-bs:], bs)
+
+        S = torch.matmul(fushed, centroid.t())
+        target = torch.zeros(bs, centroid.shape[0]).to(S.device)
+        target[range(target.shape[0]), labels] = 1
+        S = S - target * (0.001)
+        loss_cluster = F.nll_loss(F.log_softmax(S, dim=1), labels)
+        # loss_cluster = F.nll_loss(F.log_softmax(S, dim=1), labels)
+
+        # loss_cluster_v = cluster_contrast(v, centroid, labels[-bs:],bs)
+        # loss_cluster_a = cluster_contrast(a, centroid, labels[-bs:],bs)
+        # loss_cluster_t = cluster_contrast(t, centroid, labels[-bs:],bs)
+        # loss_cluster = loss_cluster_v + loss_cluster_a + loss_cluster_t
+
+        loss = loss_correlation + loss_cluster
+        print('loss_correlation:', loss_correlation.item(), 'loss_cluster:', loss_cluster.item(), 'total loss:', loss.item())
+
+    # loss_cluster.backward(retain_graph=True)
+    # loss_correlation.backward()
     loss.backward()
     opt.step()
-    return loss.item()
+    return loss_cluster.item(), loss_correlation.item(),centroid
 
 def get_soft_voting(va, at, tv):
     # Soft voting by averaging the probabilities
@@ -83,7 +117,6 @@ def get_predictions(va, at, tv):
     _, tv_preds = torch.max(tv, 1)
 
     return va_preds, at_preds, tv_preds
-
 
 def calculate_accuracy(predictions, labels):
     correct = (predictions == labels).sum().item()
@@ -196,13 +229,16 @@ if __name__ == '__main__':
     soft_accuracy_list = []
     f1_list = []
 
+    centroid = None
 
     for epoch in range(0,epoch+1):
         net.train()
         running_loss = 0.0
 
+        print('Epoch:', epoch)
         for i_batch, sample_batch in enumerate(data_loader):
-            batch_loss = TrainOneBatch(net, optimizer, sample_batch, loss, use_cls_token=args.use_cls_token)
+            clustering_loss, correlation_loss, centroid = TrainOneBatch(net, optimizer, sample_batch, loss, use_cls_token=args.use_cls_token, centroid=centroid)
+            batch_loss = clustering_loss + correlation_loss
             running_loss += batch_loss
 
         print('Epoch: {} / Total loss: {}'.format(epoch, running_loss / len(data_loader)))

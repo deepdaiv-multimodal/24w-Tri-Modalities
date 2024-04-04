@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
 from dataset.msrvtt_dataloader import MSRVTT_DataLoader
-from model.fusion_model import EverythingAtOnceModel
+from model.fusion_model_hk import EverythingAtOnceModel
 from gensim.models.keyedvectors import KeyedVectors
 from torch.utils.data import DataLoader
 
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--we_path', default='GoogleNews-vectors-negative300.bin', type=str)
-parser.add_argument('--data_path', default='msrvtt_category_test.pkl', type=str)
-parser.add_argument('--checkpoint_path', default='epoch210.pth', type=str)
+parser.add_argument('--we_path', default='C:/Users/heeryung/code/24w_deep_daiv/GoogleNews-vectors-negative300.bin', type=str)
+parser.add_argument('--data_path', default='C:/Users/heeryung/code/24w_deep_daiv/msrvtt_category_test.pkl', type=str)
+parser.add_argument('--checkpoint_path', default='D:/download/epoch200.pth', type=str)
 parser.add_argument('--token_projection', default='projection_net', type=str) 
 parser.add_argument('--use_softmax', default=False, type=bool) 
 parser.add_argument('--use_cls_token', default=False, type=bool) 
@@ -57,6 +57,17 @@ def calculate_accuracy(predictions, labels):
     accuracy = correct / total
     return accuracy
 
+def get_predictions(va, at, tv):
+    #va = torch.softmax(va, dim=1)
+    #at = torch.softmax(at, dim=1)
+    #tv = torch.softmax(tv, dim=1)
+
+    _, va_preds = torch.max(va, 1)
+    _, at_preds = torch.max(at, 1)
+    _, tv_preds = torch.max(tv, 1)
+
+    return va_preds, at_preds, tv_preds
+
 total_samples = 0
 total_accuracy = 0
 total_video_correct = 0
@@ -71,19 +82,21 @@ for data in data_loader:
     text = data['text'].cuda()
     nframes = data['nframes'].cuda()
     category = data['category'].cuda() # [batch_size,]
+    video_id = data['video_id']
 
     video = video.view(-1, video.shape[-1])
     audio = audio.view(-1, audio.shape[-2], audio.shape[-1])
     text = text.view(-1, text.shape[-2], text.shape[-1])
 
-    pred = net(video, audio, nframes, text, category) # [batch_size, 20]
-    pred_category = torch.argmax(pred, dim=1) # [batch_size,]
-    accuracy = torch.mean((pred_category == category).float()) # [batch_size,]
-    print(pred_category, '/', category)
+    va, at, tv = net(video, audio, nframes, text, category) # [batch_size, 20]
+    va_preds, at_preds, tv_preds = get_predictions(va, at, tv) # [batch_size,]
+    # accuracy = torch.mean((pred_category == category).float()) # [batch_size,]
+    print(va_preds, '/', at_preds, '/', tv_preds, '/', category, '/', video_id)
+    print('-------------------------------------------------------------')
 
-    total_accuracy += accuracy
+#     total_accuracy += accuracy
 
-# Calculate final accuracies
-accuracy = total_accuracy / len(data_loader)
+# # Calculate final accuracies
+# accuracy = total_accuracy / len(data_loader)
 
-print("Accuracy:", accuracy)
+# print("Accuracy:", accuracy)
