@@ -1,8 +1,5 @@
 data/
 ckpt/
-*.pth
-*.pkl
-*.bin
 
 .idea/
 .DS_store
